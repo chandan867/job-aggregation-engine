@@ -1,0 +1,9 @@
+[submodule "vendor/jobspy"]
+	path = vendor/jobspy
+	url = https://github.com/speedyapply/JobSpy.git
+[submodule "vendor/ats-scrapers"]
+	path = vendor/ats-scrapers
+	url = https://github.com/kalil0321/ats-scrapers.git
+[submodule "vendor/freehire"]
+	path = vendor/freehire
+	url = https://github.com/strelov1/freehire.git

@@ -20,3 +20,6 @@ job-aggregation = "job_aggregation_engine.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
