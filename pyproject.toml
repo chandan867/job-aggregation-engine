@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "job-aggregation-engine"
+version = "0.1.0"
+description = "Conservative, self-contained multi-platform job aggregation CLI"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.optional-dependencies]
+jobspy = ["python-jobspy>=1.1"]
+reed = ["httpx>=0.25", "beautifulsoup4>=4.12"]
+test = ["pytest>=8"]
+
+[project.scripts]
+job-aggregation = "job_aggregation_engine.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
