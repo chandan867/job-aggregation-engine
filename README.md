@@ -39,15 +39,13 @@ git clone --recurse-submodules https://github.com/chandan867/job-aggregation-eng
 git submodule update --init --recursive
 ```
 
-The default source plan reports the required source identifiers `jobspy`, `freehire_discovery`, and `ats_scrapers`. CLI platform selection is applied only to compatible existing adapters; live ATS crawling is not part of this slice.
+The default source plan reports the required source identifiers `jobspy`, `freehire_discovery`, and `ats_scrapers`. The default path discovers a bounded set of relevant boards through Freehire and fetches them concurrently via `ats-scrapers`, alongside JobSpy. CLI platform selection via `--platform` remains available for explicitly selecting individual compatible adapters.
 
-They are represented in the default source plan for preflight and health reporting. Live ATS crawling and benchmarking are outside this slice.
-
-These are optional upstream references/integration sources. Before using any adapter, feed, catalog, proxy, or resulting data, review and follow the upstream repository's license and source Terms of Service, robots rules, rate limits, and anti-bot policies. Availability and coverage can change independently of this package.
+These are upstream integration sources. Before using any adapter, feed, catalog, proxy, or resulting data, review and follow the upstream repository's license and source Terms of Service, robots rules, rate limits, and anti-bot policies. Availability and coverage can change independently of this package.
 
 ## Contract and caveats
 
-Adapters may return incomplete descriptions or company/salary data when a source blocks requests. JobSpy is optional and imported only when selected. Reed is an original HTML adapter and does not infer publication dates: unknown dates remain null, never “Recent”. Configure an HTTP proxy in the environment when permitted by each source's terms. ATS integrations are deliberately not included yet; the `ats-scrapers` and `freehire` submodules document possible future integration sources only.
+Adapters may return incomplete descriptions or company/salary data when a source blocks requests. JobSpy is optional and imported only when selected or when using the default full-source path. Reed is an original HTML adapter and does not infer publication dates: unknown dates remain null, never “Recent”. Configure an HTTP proxy in the environment when permitted by each source's terms.
 
 Relevance is intentionally conservative: requested title overlap is required, and an industry signal cannot rescue an unrelated title. This rejects the known “Multi-Systemic Therapy” false positive for Tax/Finance searches. Indeed `jk` is retained as the stable query identity while tracking parameters are stripped.
 

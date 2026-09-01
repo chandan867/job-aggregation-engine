@@ -2,12 +2,89 @@
 from __future__ import annotations
 import re
 import subprocess
+import sys
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from .core import Job
 
 JOBSPY_SITES = {"indeed", "linkedin", "glassdoor", "zip_recruiter", "google", "bayt", "bdjobs", "naukri"}
 REQUIRED_SUBMODULES = ("vendor/jobspy", "vendor/ats-scrapers", "vendor/freehire")
 SOURCE_PLAN = ("jobspy", "freehire_discovery", "ats_scrapers")
+ATS_PROVIDERS = ("greenhouse", "lever", "ashby", "smartrecruiters", "workable", "recruitee", "bamboohr", "breezy", "personio", "jazzhr", "jobvite", "teamtailor", "traffit")
+
+
+def _load_freehire():
+    scripts = Path(__file__).resolve().parents[2] / "vendor" / "freehire" / "scripts"
+    if not scripts.exists():
+        raise RuntimeError("Freehire source is not initialized")
+    if str(scripts) not in sys.path:
+        sys.path.insert(0, str(scripts))
+    import ats_boards
+    return ats_boards
+
+
+def discover_freehire_boards(query: str, providers: tuple[str, ...] = ATS_PROVIDERS, limit: int = 5) -> list[tuple[str, str, str]]:
+    """Discover a bounded set of ATS boards without writing to the vendor checkout."""
+    _load_freehire()
+    discover = __import__("discover_boards")
+    ats_boards = sys.modules["ats_boards"]
+    supported = [provider for provider in providers if provider in discover.PROVIDER_HOSTS]
+    boards = discover.collect_candidates(supported, ["ddg"], query, limit)
+    found = []
+    for (provider, slug), name in boards.items():
+        if ats_boards.validate(provider, slug):
+            found.append((provider, slug, name))
+            if len(found) >= limit:
+                break
+    return found
+
+
+def _ats_job(job, provider: str, board: str) -> Job | None:
+    url = str(getattr(job, "url", "") or "")
+    if not url:
+        return None
+    posted = getattr(job, "posted_at", None)
+    if hasattr(posted, "isoformat"):
+        posted = posted.isoformat()
+    return Job(
+        title=str(getattr(job, "title", "") or ""), company=str(getattr(job, "company", "") or board),
+        salary=getattr(job, "salary_summary", None), remote=bool(getattr(job, "is_remote", False)),
+        description=str(getattr(job, "description", "") or ""), industry=None, method="ats_scrapers",
+        confidence=0.75, date_posted=str(posted) if posted else None,
+        location=str(getattr(job, "location", "") or ""), platform=provider,
+        job_url=url, apply_url=str(getattr(job, "apply_url", "") or url),
+    )
+
+
+def ats_scrapers_search(boards: list[tuple[str, str, str]], limit: int = 25, timeout: float = 15, concurrency: int = 4) -> tuple[list[Job], int]:
+    """Fetch discovered boards concurrently; failures are isolated per board."""
+    vendor = Path(__file__).resolve().parents[2] / "vendor" / "ats-scrapers" / "src"
+    if not vendor.exists():
+        raise RuntimeError("ats-scrapers source is not initialized")
+    if str(vendor) not in sys.path:
+        sys.path.insert(0, str(vendor))
+    from ats_scrapers.scrapers import get_scraper
+    def fetch_one(item):
+        provider, board, _ = item
+        try:
+            converted = []
+            for row in get_scraper(provider, board, timeout=timeout).fetch()[:limit]:
+                converted_job = _ats_job(row, provider, board)
+                if converted_job:
+                    converted.append(converted_job)
+            return converted
+        except Exception:
+            return None
+    jobs, failures = [], 0
+    with ThreadPoolExecutor(max_workers=max(1, concurrency)) as pool:
+        futures = [pool.submit(fetch_one, item) for item in boards]
+        for future in as_completed(futures):
+            result = future.result()
+            if result is None:
+                failures += 1
+            else:
+                jobs.extend(result)
+    return jobs, failures
 
 
 def submodule_preflight(root: str = ".", allow_partial: bool = False) -> list[str]:
