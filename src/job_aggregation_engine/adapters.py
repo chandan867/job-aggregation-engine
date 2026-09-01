@@ -1,13 +1,54 @@
 """Optional source adapters. Network clients are intentionally imported at runtime."""
 from __future__ import annotations
 import re
-from datetime import datetime, timezone
+import subprocess
+from pathlib import Path
 from .core import Job
+
+JOBSPY_SITES = {"indeed", "linkedin", "glassdoor", "zip_recruiter", "google", "bayt", "bdjobs", "naukri"}
+REQUIRED_SUBMODULES = ("vendor/jobspy", "vendor/ats-scrapers", "vendor/freehire")
+SOURCE_PLAN = ("jobspy", "freehire_discovery", "ats_scrapers")
+
+
+def submodule_preflight(root: str = ".", allow_partial: bool = False) -> list[str]:
+    """Verify required gitlinks have initialized submodule worktrees."""
+    root_path = Path(root)
+    missing = []
+    for relative in REQUIRED_SUBMODULES:
+        checkout = root_path / relative
+        try:
+            mode = subprocess.run(
+                ["git", "-C", str(root_path), "ls-files", "--stage", "--", relative],
+                check=True, capture_output=True, text=True,
+            ).stdout.split(maxsplit=1)[0]
+            initialized = subprocess.run(
+                ["git", "-C", str(checkout), "rev-parse", "--is-inside-work-tree"],
+                check=True, capture_output=True, text=True,
+            ).stdout.strip() == "true"
+        except (OSError, subprocess.CalledProcessError, IndexError):
+            mode, initialized = "", False
+        if mode != "160000" or not initialized:
+            missing.append(relative)
+    if missing and not allow_partial:
+        command = "git submodule update --init --recursive"
+        raise RuntimeError("Required source submodules are not initialized: " + ", ".join(missing) + f". Run `{command}` or pass --allow-partial-sources.")
+    return missing
+
+
+def source_plan(platforms: list[str] | None = None) -> list[str]:
+    """Return the stable default source identifiers.
+
+    Platform selection is interpreted by compatible adapters; it does not remove
+    required source families from the plan.
+    """
+    return list(SOURCE_PLAN)
+
 
 def expand_title(title: str) -> list[str]:
     words = [title.strip()]
     aliases = {"tax advisor": ["tax consultant", "tax manager"], "software engineer": ["software developer", "backend engineer"]}
     return list(dict.fromkeys(words + aliases.get(title.strip().lower(), [])))
+
 
 def jobspy_search(titles, locations, country, radius, hours, platforms, limit=25):
     try:
@@ -32,6 +73,7 @@ def jobspy_search(titles, locations, country, radius, hours, platforms, limit=25
                     location=str(row.get("location") or location), platform=str(row.get("site") or "jobspy"),
                     job_url=url, apply_url=row.get("job_url_direct") or row.get("job_url")))
     return jobs
+
 
 class ReedUKAdapter:
     """Original Reed UK HTML adapter; no date is inferred when Reed omits it."""

@@ -1,6 +1,6 @@
 # Job Aggregation Engine
 
-A clean, original Python 3.11+ package and CLI for conservative job discovery. The runtime remains independent of the optional upstream source repositories vendored as Git submodules under `vendor/`.
+A clean, original Python 3.11+ package and CLI for conservative job discovery. Upstream source repositories are vendored as Git submodules under `vendor/` and checked by the default CLI preflight.
 
 ## Install
 
@@ -16,7 +16,9 @@ For the default JobSpy-backed CLI sources (Indeed, LinkedIn, Glassdoor, Google, 
 pip install -e '.[jobspy]'
 ```
 
-The default CLI does not require Git submodules. Install the `reed` extra only when selecting `reed_uk`, and install `test` when running the test suite.
+The default CLI requires all source submodules. Install the `reed` extra only when selecting `reed_uk`, and install `test` when running the test suite.
+
+After cloning, initialize sources with `git submodule update --init --recursive`. Runs fail closed if `vendor/jobspy`, `vendor/ats-scrapers`, or `vendor/freehire` is missing; use `--allow-partial-sources` only when accepting reduced coverage and source failures.
 
 ## Examples
 
@@ -29,7 +31,7 @@ Repeat `--title`, `--location`, and `--platform`. Use `--no-expand-titles` to di
 
 ## Optional upstream source catalogs
 
-The `vendor/` entries are pinned Git submodules containing optional upstream references and integration sources; they are not copied into this repository and are not required at runtime. To inspect them as a teammate:
+The `vendor/` entries are pinned Git submodules containing required upstream references and integration sources; they are not copied into this repository. Recursive clone is mandatory for the default run. To inspect them as a teammate:
 
 ```bash
 git clone --recurse-submodules https://github.com/chandan867/job-aggregation-engine.git
@@ -37,11 +39,9 @@ git clone --recurse-submodules https://github.com/chandan867/job-aggregation-eng
 git submodule update --init --recursive
 ```
 
-Their coverage contributions are deliberately separate from the current CLI:
+The default source plan reports the required source identifiers `jobspy`, `freehire_discovery`, and `ats_scrapers`. CLI platform selection is applied only to compatible existing adapters; live ATS crawling is not part of this slice.
 
-- **JobSpy**: aggregators for job boards such as Indeed, LinkedIn, Glassdoor, Google, and ZipRecruiter. The current CLI already uses the installed `python-jobspy` package when those platforms are selected.
-- **ats-scrapers**: reusable Python adapters and hosted public feeds for ATS platforms and company career sources. The current CLI does not automatically invoke these adapters.
-- **freehire**: an ATS-board registry and source/discovery catalog for direct company career postings. The current CLI does not automatically consume its catalog.
+They are represented in the default source plan for preflight and health reporting. Live ATS crawling and benchmarking are outside this slice.
 
 These are optional upstream references/integration sources. Before using any adapter, feed, catalog, proxy, or resulting data, review and follow the upstream repository's license and source Terms of Service, robots rules, rate limits, and anti-bot policies. Availability and coverage can change independently of this package.
 
