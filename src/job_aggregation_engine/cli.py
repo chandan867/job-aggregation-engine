@@ -53,8 +53,19 @@ def main(argv=None):
     if default_path:
         attempted += 2
         try:
-            boards = discover_freehire_boards(" ".join(args.title), limit=args.board_limit)
-            ats_jobs, ats_failures = ats_scrapers_search(boards, limit=args.limit, timeout=args.timeout, concurrency=args.concurrency)
+            discovered_boards = []
+            seen_boards = set()
+            for t in args.title:
+                for b in discover_freehire_boards(t, limit=args.board_limit):
+                    key = (b[0], b[1])
+                    if key not in seen_boards:
+                        seen_boards.add(key)
+                        discovered_boards.append(b)
+                    if len(discovered_boards) >= args.board_limit:
+                        break
+                if len(discovered_boards) >= args.board_limit:
+                    break
+            ats_jobs, ats_failures = ats_scrapers_search(discovered_boards, limit=args.limit, timeout=args.timeout, concurrency=args.concurrency)
             jobs += ats_jobs
             failures += ats_failures
         except Exception:

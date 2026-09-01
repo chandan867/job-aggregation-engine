@@ -23,19 +23,66 @@ def _load_freehire():
     return ats_boards
 
 
+def _freehire_sources_dir() -> Path:
+    return Path(__file__).resolve().parents[2] / "vendor" / "freehire" / "sources"
+
+
 def discover_freehire_boards(query: str, providers: tuple[str, ...] = ATS_PROVIDERS, limit: int = 5) -> list[tuple[str, str, str]]:
     """Discover a bounded set of ATS boards without writing to the vendor checkout."""
     _load_freehire()
     discover = __import__("discover_boards")
     ats_boards = sys.modules["ats_boards"]
     supported = [provider for provider in providers if provider in discover.PROVIDER_HOSTS]
-    boards = discover.collect_candidates(supported, ["ddg"], query, limit)
     found = []
-    for (provider, slug), name in boards.items():
-        if ats_boards.validate(provider, slug):
-            found.append((provider, slug, name))
-            if len(found) >= limit:
-                break
+    seen = set()
+    try:
+        boards = discover.collect_candidates(supported, ["ddg"], query, limit)
+        for (provider, slug), name in boards.items():
+            if ats_boards.validate(provider, slug):
+                key = (provider, slug)
+                if key not in seen:
+                    seen.add(key)
+                    found.append((provider, slug, name))
+                if len(found) >= limit:
+                    return found
+    except Exception:
+        pass
+
+    if len(found) < limit:
+        sources = _freehire_sources_dir()
+        q_tokens = [t.lower() for t in query.split() if len(t) > 2]
+        for provider in supported:
+            p = sources / f"{provider}.yml"
+            if not p.exists():
+                continue
+            entries = re.findall(r'-\s+company:\s*(.+)\n\s+board:\s*(.+)', p.read_text(encoding="utf-8", errors="ignore"))
+            for comp, slug in entries:
+                comp_clean = comp.strip(' "\'')
+                slug_clean = slug.strip(' "\'')
+                if q_tokens and not any(t in comp_clean.lower() or t in slug_clean.lower() for t in q_tokens):
+                    continue
+                key = (provider, slug_clean)
+                if key not in seen and ats_boards.validate(provider, slug_clean):
+                    seen.add(key)
+                    found.append((provider, slug_clean, comp_clean))
+                    if len(found) >= limit:
+                        return found
+
+        for provider in supported:
+            p = sources / f"{provider}.yml"
+            if not p.exists():
+                continue
+            entries = re.findall(r'-\s+company:\s*(.+)\n\s+board:\s*(.+)', p.read_text(encoding="utf-8", errors="ignore"))
+            for comp, slug in entries:
+                comp_clean = comp.strip(' "\'')
+                slug_clean = slug.strip(' "\'')
+                key = (provider, slug_clean)
+                if key not in seen and ats_boards.validate(provider, slug_clean):
+                    seen.add(key)
+                    found.append((provider, slug_clean, comp_clean))
+                    if len(found) >= limit:
+                        return found
+
     return found
 
 
